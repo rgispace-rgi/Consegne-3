@@ -39,6 +39,11 @@
         .header h1 {
             font-size: 22px;
             font-weight: 600;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            line-height: 1;
         }
 
         .header-buttons {
@@ -742,7 +747,11 @@
 
         @media (max-width: 480px) {
             .header h1 {
-                font-size: 18px;
+                font-size: 16px;
+            }
+
+            .header h1 div:first-child {
+                font-size: 28px !important;
             }
             
             .btn-registro,
@@ -806,7 +815,11 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🏠 Consegne Immobili</h1>
+            <h1>
+                <div style="font-size: 32px;">🏠</div>
+                <div style="font-size: 16px; line-height: 1.2;">Consegne</div>
+                <div style="font-size: 16px; line-height: 1.2;">Immobili</div>
+            </h1>
             <div class="header-buttons">
                 <button class="btn-registro" onclick="openRegistro()">📋 Registro</button>
                 <button class="btn-calendar" onclick="openCalendar()">📅 Calendario</button>
@@ -895,7 +908,7 @@
         let currentEditId = null;
         let currentCalendarDate = new Date();
 
-        const DATA_VERSION = 24; // Incrementa per forzare reset dati
+        const DATA_VERSION = 25; // Incrementa per forzare reset dati
 
         // Load data with version check
         function loadDeliveries() {
