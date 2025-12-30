@@ -200,6 +200,22 @@
             animation: fadeIn 0.3s;
         }
 
+        #dayDeliveriesModal {
+            z-index: 1100;
+        }
+
+        #dayDeliveriesModal .modal-content {
+            box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+        }
+
+        #detailModal {
+            z-index: 1200;
+        }
+
+        #detailModal .modal-content {
+            box-shadow: 0 30px 80px rgba(0,0,0,0.5);
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -222,7 +238,7 @@
 
         #calendarModal .modal-content {
             width: 95%;
-            max-width: 600px;
+            max-width: 700px;
         }
 
         @keyframes slideUp {
@@ -455,14 +471,36 @@
         .calendar-day {
             aspect-ratio: 1;
             display: flex;
-            align-items: center;
-            justify-content: center;
+            flex-direction: column;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding: 5px;
             border-radius: 8px;
             font-size: 16px;
             cursor: pointer;
             transition: all 0.3s;
             background: #f9f9f9;
-            min-height: 45px;
+            min-height: 80px;
+            overflow: hidden;
+        }
+
+        .calendar-day-number {
+            font-weight: bold;
+            font-size: 16px;
+            margin-bottom: 4px;
+        }
+
+        .calendar-day-units {
+            font-size: 10px;
+            line-height: 1.3;
+            width: 100%;
+        }
+
+        .calendar-day-units div {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 2px;
         }
 
         .calendar-day:hover {
@@ -480,6 +518,10 @@
             font-weight: bold;
         }
 
+        .calendar-day.has-delivery .calendar-day-number {
+            color: white;
+        }
+
         .calendar-day.has-delivery-completed {
             background: linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%);
             color: #9e9e9e;
@@ -491,8 +533,16 @@
             color: #c62828;
         }
 
+        .calendar-day.weekend .calendar-day-number {
+            color: #c62828;
+        }
+
         .calendar-day.weekend.has-delivery {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .calendar-day.weekend.has-delivery .calendar-day-number {
             color: white;
         }
 
@@ -611,6 +661,46 @@
             color: #667eea;
         }
 
+        .keys-icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            vertical-align: middle;
+            margin-right: 4px;
+        }
+
+        .global-close-btn {
+            display: none;
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 50px;
+            height: 50px;
+            background: #ff4444;
+            color: white;
+            border: 3px solid white;
+            border-radius: 50%;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 4px 20px rgba(255, 68, 68, 0.5);
+            transition: all 0.3s;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .global-close-btn:hover {
+            background: #cc0000;
+            transform: translateX(-50%) scale(1.1);
+            box-shadow: 0 6px 25px rgba(255, 68, 68, 0.7);
+        }
+
+        .global-close-btn:active {
+            transform: translateX(-50%) scale(0.95);
+        }
+
         .calendar-nav {
             display: flex;
             justify-content: space-between;
@@ -661,6 +751,23 @@
                 font-size: 14px;
             }
 
+            .global-close-btn {
+                top: 15px;
+                left: 50%;
+                transform: translateX(-50%);
+                width: 45px;
+                height: 45px;
+                font-size: 24px;
+            }
+
+            .global-close-btn:hover {
+                transform: translateX(-50%) scale(1.1);
+            }
+
+            .global-close-btn:active {
+                transform: translateX(-50%) scale(0.95);
+            }
+
             .search-input {
                 font-size: 14px;
                 padding: 10px 12px;
@@ -677,7 +784,16 @@
 
             .calendar-day {
                 font-size: 14px;
-                min-height: 40px;
+                min-height: 70px;
+                padding: 4px;
+            }
+
+            .calendar-day-number {
+                font-size: 14px;
+            }
+
+            .calendar-day-units {
+                font-size: 9px;
             }
 
             .calendar-header {
@@ -760,11 +876,18 @@
                 <h2 class="modal-title">📋 Registro Attività</h2>
                 <button class="close-btn" onclick="closeModal('registroModal')">&times;</button>
             </div>
+            <div class="search-container" style="padding: 10px 15px; background: #f5f5f5;">
+                <input type="text" id="registroSearchInput" class="search-input" placeholder="🔍 Cerca nel registro..." onkeyup="filterRegistro()" oninput="toggleRegistroClearButton()">
+                <button class="clear-search" id="clearRegistroSearchBtn" onclick="clearRegistroSearch()" style="display: none;">&times;</button>
+            </div>
             <div class="registro-list" id="registroList">
                 <!-- Registro events will be inserted here -->
             </div>
         </div>
     </div>
+
+    <!-- Global Close Button (appears when 2+ modals are open) -->
+    <button class="global-close-btn" id="globalCloseBtn" onclick="closeAllModals()">&times;</button>
 
     <script>
         let deliveries = [];
@@ -772,7 +895,7 @@
         let currentEditId = null;
         let currentCalendarDate = new Date();
 
-        const DATA_VERSION = 15; // Incrementa per forzare reset dati
+        const DATA_VERSION = 23; // Incrementa per forzare reset dati
 
         // Load data with version check
         function loadDeliveries() {
@@ -1108,17 +1231,50 @@
             `;
 
             document.getElementById('detailModal').style.display = 'block';
+            checkGlobalCloseButton();
         }
 
         function closeModal(modalId) {
             document.getElementById(modalId).style.display = 'none';
             currentEditId = null;
+            checkGlobalCloseButton();
+        }
+
+        function checkGlobalCloseButton() {
+            // Count how many modals are currently open
+            const modals = ['calendarModal', 'dayDeliveriesModal', 'detailModal', 'registroModal'];
+            let openCount = 0;
+            
+            modals.forEach(modalId => {
+                const modal = document.getElementById(modalId);
+                if (modal && modal.style.display === 'block') {
+                    openCount++;
+                }
+            });
+            
+            // Show global close button only if 2 or more modals are open
+            const globalBtn = document.getElementById('globalCloseBtn');
+            if (openCount >= 2) {
+                globalBtn.style.display = 'flex';
+            } else {
+                globalBtn.style.display = 'none';
+            }
+        }
+
+        function closeAllModals() {
+            const modals = ['calendarModal', 'dayDeliveriesModal', 'detailModal', 'registroModal'];
+            modals.forEach(modalId => {
+                document.getElementById(modalId).style.display = 'none';
+            });
+            currentEditId = null;
+            checkGlobalCloseButton();
         }
 
         function openCalendar() {
             currentCalendarDate = new Date();
             renderCalendar();
             document.getElementById('calendarModal').style.display = 'block';
+            checkGlobalCloseButton();
         }
 
         function changeMonth(delta) {
@@ -1139,15 +1295,21 @@
             const daysInMonth = new Date(year, month + 1, 0).getDate();
             const today = new Date();
 
-            // Create maps for active and completed deliveries by date
-            const activeDeliveryDates = new Set();
-            const completedDeliveryDates = new Set();
+            // Create maps for deliveries by date with unit names
+            const deliveriesByDate = {};
             
             deliveries.forEach(d => {
+                if (!deliveriesByDate[d.deliveryDate]) {
+                    deliveriesByDate[d.deliveryDate] = {
+                        active: [],
+                        completed: []
+                    };
+                }
+                
                 if (d.completedDate) {
-                    completedDeliveryDates.add(d.deliveryDate);
+                    deliveriesByDate[d.deliveryDate].completed.push(d.unitName);
                 } else {
-                    activeDeliveryDates.add(d.deliveryDate);
+                    deliveriesByDate[d.deliveryDate].active.push(d.unitName);
                 }
             });
 
@@ -1169,9 +1331,11 @@
                 const isToday = today.getDate() === day && 
                                today.getMonth() === month && 
                                today.getFullYear() === year;
-                const hasActiveDelivery = activeDeliveryDates.has(dateString);
-                const hasCompletedDelivery = completedDeliveryDates.has(dateString);
                 const isWeekendOrHol = isWeekendOrHoliday(year, month, day, dayOfWeek);
+                
+                const dayDeliveries = deliveriesByDate[dateString];
+                const hasActiveDelivery = dayDeliveries && dayDeliveries.active.length > 0;
+                const hasCompletedDelivery = dayDeliveries && dayDeliveries.completed.length > 0;
                 
                 let classes = 'calendar-day';
                 if (isToday) classes += ' today';
@@ -1184,34 +1348,65 @@
                     classes += ' has-delivery-completed';
                 }
                 
-                calendarHTML += `<div class="${classes}" onclick="showDayDeliveries('${dateString}')">${day}</div>`;
+                // Build units list HTML
+                let unitsHTML = '';
+                if (dayDeliveries) {
+                    if (dayDeliveries.active.length > 0) {
+                        unitsHTML = dayDeliveries.active.map(unit => `<div>${unit}</div>`).join('');
+                    } else if (dayDeliveries.completed.length > 0) {
+                        unitsHTML = dayDeliveries.completed.map(unit => `<div>${unit}</div>`).join('');
+                    }
+                }
+                
+                calendarHTML += `
+                    <div class="${classes}" onclick="showDayDeliveries('${dateString}')">
+                        <div class="calendar-day-number">${day}</div>
+                        <div class="calendar-day-units">${unitsHTML}</div>
+                    </div>
+                `;
             }
 
             document.getElementById('calendarGrid').innerHTML = calendarHTML;
         }
 
         function openRegistro() {
+            document.getElementById('registroSearchInput').value = '';
+            document.getElementById('clearRegistroSearchBtn').style.display = 'none';
             renderRegistro();
             document.getElementById('registroModal').style.display = 'block';
+            checkGlobalCloseButton();
         }
 
-        function renderRegistro() {
+        function renderRegistro(filteredLog = null) {
             const registroList = document.getElementById('registroList');
+            const logToDisplay = filteredLog !== null ? filteredLog : activityLog;
             
-            if (activityLog.length === 0) {
-                registroList.innerHTML = `
-                    <div class="empty-state">
-                        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
-                        </svg>
-                        <p>Nessuna attività registrata</p>
-                    </div>
-                `;
+            if (logToDisplay.length === 0) {
+                const searchTerm = document.getElementById('registroSearchInput').value;
+                if (searchTerm) {
+                    registroList.innerHTML = `
+                        <div class="empty-state">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                            <p>Nessuna attività trovata per "${searchTerm}"</p>
+                        </div>
+                    `;
+                } else {
+                    registroList.innerHTML = `
+                        <div class="empty-state">
+                            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            <p>Nessuna attività registrata</p>
+                        </div>
+                    `;
+                }
                 return;
             }
             
             // Sort by date (most recent first)
-            const sortedLog = [...activityLog].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+            const sortedLog = [...logToDisplay].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             
             registroList.innerHTML = sortedLog.map(event => {
                 let tipoLabel = '';
@@ -1253,6 +1448,45 @@
             }).join('');
         }
 
+        function filterRegistro() {
+            const searchTerm = document.getElementById('registroSearchInput').value.toLowerCase().trim();
+            
+            if (searchTerm === '') {
+                renderRegistro();
+                return;
+            }
+
+            // Filter activity log by unit name, tipo, or dettagli
+            const filtered = activityLog.filter(event => {
+                const unitName = event.unita.toLowerCase();
+                const tipo = event.tipo.toLowerCase();
+                const dettagli = event.dettagli.toLowerCase();
+                
+                return unitName.includes(searchTerm) || 
+                       tipo.includes(searchTerm) || 
+                       dettagli.includes(searchTerm);
+            });
+
+            renderRegistro(filtered);
+        }
+
+        function toggleRegistroClearButton() {
+            const searchInput = document.getElementById('registroSearchInput');
+            const clearBtn = document.getElementById('clearRegistroSearchBtn');
+            
+            if (searchInput.value.length > 0) {
+                clearBtn.style.display = 'flex';
+            } else {
+                clearBtn.style.display = 'none';
+            }
+        }
+
+        function clearRegistroSearch() {
+            document.getElementById('registroSearchInput').value = '';
+            document.getElementById('clearRegistroSearchBtn').style.display = 'none';
+            renderRegistro();
+        }
+
         function formatDateTime(date) {
             const day = date.getDate();
             const month = monthNames[date.getMonth()];
@@ -1278,9 +1512,12 @@
                     </div>
                 `;
             } else {
+                const keysIcon = '🔑';
+                
                 listContainer.innerHTML = dayDeliveries.map(delivery => {
                     const deliveryClass = getDeliveryClass(delivery);
-                    const statusIcon = delivery.completedDate ? '✓' : '📦';
+                    const statusIcon = delivery.completedDate ? '✓' : keysIcon;
+                    const statusText = delivery.completedDate ? 'Consegnata' : 'Consegna prevista';
                     
                     return `
                         <div class="day-delivery-item ${deliveryClass}" onclick="showDetailsFromDay('${delivery.id}')">
@@ -1290,7 +1527,7 @@
                             <div class="delivery-date">
                                 ${delivery.completedDate ? 
                                     `<small>Consegnata il ${formatDate(delivery.completedDate)}</small>` : 
-                                    `<small>📦 Consegna prevista</small>`
+                                    `<small>${statusText}</small>`
                                 }
                             </div>
                         </div>
@@ -1298,12 +1535,11 @@
                 }).join('');
             }
             
-            closeModal('calendarModal');
             document.getElementById('dayDeliveriesModal').style.display = 'block';
+            checkGlobalCloseButton();
         }
 
         function showDetailsFromDay(id) {
-            closeModal('dayDeliveriesModal');
             showDetails(id);
         }
 
@@ -1312,6 +1548,7 @@
             if (event.target.classList.contains('modal')) {
                 event.target.style.display = 'none';
                 currentEditId = null;
+                checkGlobalCloseButton();
             }
         }
 
