@@ -908,7 +908,7 @@
         let currentEditId = null;
         let currentCalendarDate = new Date();
 
-        const DATA_VERSION = 25; // Incrementa per forzare reset dati
+        const DATA_VERSION = 26; // Incrementa per forzare reset dati
 
         // Load data with version check
         function loadDeliveries() {
@@ -1619,6 +1619,14 @@
                     createdDate: '2025-12-29T15:30:00',
                     notes: 'Piano cottura e il lavello',
                     completedDate: null
+                },
+                {
+                    id: '7',
+                    unitName: 'Cemento Armato',
+                    deliveryDate: '2026-01-22',
+                    createdDate: '2025-12-30T16:30:00',
+                    notes: '',
+                    completedDate: null
                 }
             ];
             
@@ -1683,6 +1691,12 @@
                     timestamp: '2025-12-29T16:00:00',
                     unita: 'Fabbrica 15',
                     dettagli: 'Aggiunta nota: Piano cottura e il lavello'
+                },
+                {
+                    tipo: 'inserimento',
+                    timestamp: '2025-12-30T16:30:00',
+                    unita: 'Cemento Armato',
+                    dettagli: 'Consegna prevista: 22 Gennaio'
                 }
             ];
             
