@@ -143,6 +143,7 @@
             cursor: pointer;
             transition: all 0.3s;
             border-left: 5px solid;
+            position: relative;
         }
 
         .delivery-card:hover {
@@ -151,8 +152,75 @@
         }
 
         .delivery-card.completed {
-            opacity: 0.5;
+            opacity: 0.7;
             background: #f5f5f5;
+        }
+
+        .completed-badge {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+        }
+
+        .completed-badge .check-icon-box {
+            width: 22px;
+            height: 22px;
+            background: #4CAF50;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .status-badge {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #888;
+        }
+
+        .status-badge .status-icon-box {
+            width: 22px;
+            height: 22px;
+            border-radius: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+        }
+
+        .status-badge .status-icon-box.orange {
+            background: #ff9800;
+        }
+
+        .status-badge .status-icon-box.purple {
+            background: #9c27b0;
+        }
+
+        .status-badge.in-consegna span:last-child {
+            color: #ff9800;
+        }
+
+        .status-badge.pendente span:last-child {
+            color: #9c27b0;
         }
 
         .delivery-card.urgent {
@@ -168,6 +236,11 @@
         .delivery-card.ok {
             border-left-color: #4CAF50;
             background: #f1f8f4;
+        }
+
+        .delivery-card.pendente {
+            border-left-color: #9c27b0;
+            background: #f3e5f5;
         }
 
         .delivery-header {
@@ -564,6 +637,7 @@
             cursor: pointer;
             transition: all 0.3s;
             border-left: 5px solid;
+            position: relative;
         }
 
         .day-delivery-item:hover {
@@ -572,7 +646,7 @@
         }
 
         .day-delivery-item.completed {
-            opacity: 0.5;
+            opacity: 0.7;
             background: #f5f5f5;
         }
 
@@ -589,6 +663,11 @@
         .day-delivery-item.ok {
             border-left-color: #4CAF50;
             background: #f1f8f4;
+        }
+
+        .day-delivery-item.pendente {
+            border-left-color: #9c27b0;
+            background: #f3e5f5;
         }
 
         #dayDeliveriesList {
@@ -632,6 +711,26 @@
         .registro-item.evento-consegna {
             border-left-color: #2196F3;
             background: #e3f2fd;
+        }
+
+        .registro-item.evento-modifica {
+            border-left-color: #9c27b0;
+            background: #f3e5f5;
+        }
+
+        .registro-item.evento-da-consegnare {
+            border-left-color: #ff9800;
+            background: #fff3e0;
+        }
+
+        .registro-item.evento-pendente {
+            border-left-color: #9c27b0;
+            background: #f3e5f5;
+        }
+
+        .registro-item.evento-cancellata {
+            border-left-color: #f44336;
+            background: #ffebee;
         }
 
         .registro-header {
@@ -810,6 +909,50 @@
                 padding: 8px;
             }
         }
+
+        /* Feedback Popup */
+        .sync-feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            border-radius: 20px;
+            padding: 30px 40px;
+            box-shadow: 0 10px 50px rgba(0,0,0,0.3);
+            z-index: 10000;
+            text-align: center;
+            display: none;
+            animation: popIn 0.3s ease;
+            border: 3px solid #4CAF50;
+        }
+
+        .sync-feedback.show {
+            display: block;
+        }
+
+        @keyframes popIn {
+            from { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+            to { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+        }
+
+        .sync-feedback .icon {
+            width: 70px;
+            height: 70px;
+            background: #4CAF50;
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 15px;
+            font-size: 40px;
+        }
+
+        .sync-feedback .message {
+            font-size: 18px;
+            color: #333;
+            font-weight: 600;
+        }
     </style>
 </head>
 <body>
@@ -821,6 +964,7 @@
                 <div style="font-size: 16px; line-height: 1.2;">Immobili</div>
             </h1>
             <div class="header-buttons">
+                <button class="btn-registro" onclick="loadFromGoogle()" title="Aggiorna da Google Sheets">🔄</button>
                 <button class="btn-registro" onclick="openRegistro()">📋 Registro</button>
                 <button class="btn-calendar" onclick="openCalendar()">📅 Calendario</button>
             </div>
@@ -902,13 +1046,84 @@
     <!-- Global Close Button (appears when 2+ modals are open) -->
     <button class="global-close-btn" id="globalCloseBtn" onclick="closeAllModals()">&times;</button>
 
+    <!-- Sync Feedback Popup -->
+    <div class="sync-feedback" id="syncFeedback">
+        <div class="icon">✅</div>
+        <div class="message">Dati sincronizzati!</div>
+    </div>
+
     <script>
+        // ============================================
+        // GOOGLE SHEETS API
+        // ============================================
+        const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx7lrmOwf2GebxItnwgWCMCrYR4GVa9AjwzeaqPnLOloFWc9C_gvdG4TqpjpKHRMJo/exec';
+        
         let deliveries = [];
         let activityLog = [];
         let currentEditId = null;
         let currentCalendarDate = new Date();
 
         const DATA_VERSION = 26; // Incrementa per forzare reset dati
+
+        // Load data from Google Sheets
+        async function loadFromGoogle() {
+            try {
+                const response = await fetch(`${WEBAPP_URL}?action=getData`);
+                const result = await response.json();
+                
+                if (result && result.consegne) {
+                    deliveries = result.consegne.map(c => ({
+                        id: c.id,
+                        unitName: c.unitName,
+                        deliveryDate: c.deliveryDate,
+                        oraConsegna: c.oraConsegna || '',
+                        createdDate: c.dataInserimento || new Date().toISOString(),
+                        notes: c.note || '',
+                        completedDate: c.completedDate || null,
+                        stato: c.stato || 'da_consegnare'
+                    }));
+                    
+                    // Get list of consegne unit names for filtering
+                    const consegneUnits = deliveries.map(d => d.unitName.toLowerCase());
+                    
+                    // Load registro - ONLY consegne-related activities
+                    if (result.registro) {
+                        activityLog = result.registro
+                            .filter(r => {
+                                if (r.tipo === 'consegna') return true;
+                                if (r.dettagli && r.dettagli.toLowerCase().includes('consegna')) return true;
+                                if (r.unita && consegneUnits.includes(r.unita.toLowerCase())) return true;
+                                return false;
+                            })
+                            .map(r => ({
+                                tipo: r.tipo,
+                                timestamp: r.timestamp,
+                                unita: r.unita,
+                                dettagli: r.dettagli
+                            }));
+                    }
+                    
+                    saveToLocalStorage();
+                    renderDeliveries();
+                    console.log('✅ Dati caricati da Google Sheets:', deliveries.length, 'consegne');
+                    showSyncFeedback();
+                    return true;
+                }
+                return false;
+            } catch (error) {
+                console.error('Errore caricamento da Google:', error);
+                return false;
+            }
+        }
+
+        // Show sync feedback popup
+        function showSyncFeedback() {
+            const feedback = document.getElementById('syncFeedback');
+            feedback.classList.add('show');
+            setTimeout(() => {
+                feedback.classList.remove('show');
+            }, 1500);
+        }
 
         // Load data with version check
         function loadDeliveries() {
@@ -1043,6 +1258,7 @@
 
         function getDeliveryClass(delivery) {
             if (delivery.completedDate) return 'completed';
+            if (delivery.stato === 'pendente') return 'pendente';
             
             const daysUntil = getDaysUntil(delivery.deliveryDate);
             
@@ -1180,16 +1396,46 @@
                     statusText = `Tra ${daysUntil} giorni`;
                 }
 
+                // Determine badge based on status
+                let badgeHtml = '';
+                let unitIcon = '🔑';
+                
+                if (delivery.completedDate) {
+                    unitIcon = '🔑✅';
+                    badgeHtml = `
+                        <div class="completed-badge">
+                            <span class="check-icon-box">✓</span>
+                            <span>CONSEGNATO</span>
+                        </div>
+                    `;
+                } else if (delivery.stato === 'pendente') {
+                    unitIcon = '🔑🟣';
+                    badgeHtml = `
+                        <div class="status-badge pendente">
+                            <span class="status-icon-box purple">●</span>
+                            <span>PENDENTE</span>
+                        </div>
+                    `;
+                } else {
+                    badgeHtml = `
+                        <div class="status-badge in-consegna">
+                            <span class="status-icon-box orange">●</span>
+                            <span>IN CONSEGNA</span>
+                        </div>
+                    `;
+                }
+
                 return `
                     <div class="delivery-card ${deliveryClass}" onclick="showDetails('${delivery.id}')">
                         <div class="delivery-header">
-                            <span class="unit-name">${delivery.unitName}</span>
+                            <span class="unit-name">${unitIcon} ${delivery.unitName}</span>
                         </div>
                         <div class="delivery-date">
                             <strong>Consegna:</strong> ${formatDate(delivery.deliveryDate)}
                             <br>
                             <small>${statusText}</small>
                         </div>
+                        ${badgeHtml}
                     </div>
                 `;
             }).join('');
@@ -1204,10 +1450,18 @@
             const modalBody = document.getElementById('modalBody');
             const daysUntil = getDaysUntil(delivery.deliveryDate);
             
+            // Determine unit icon
+            let unitIcon = '🔑';
+            if (delivery.completedDate) {
+                unitIcon = '🔑✅';
+            } else if (delivery.stato === 'pendente') {
+                unitIcon = '🔑🟣';
+            }
+            
             modalBody.innerHTML = `
                 <div class="detail-row">
                     <div class="detail-label">Unità</div>
-                    <div class="detail-value">${delivery.unitName}</div>
+                    <div class="detail-value">${unitIcon} ${delivery.unitName}</div>
                 </div>
                 <div class="detail-row">
                     <div class="detail-label">Data Inserimento</div>
@@ -1226,7 +1480,8 @@
                     <div class="detail-row">
                         <div class="detail-label">Stato</div>
                         <div class="detail-value">
-                            ${daysUntil < 0 ? `⚠️ In ritardo di ${Math.abs(daysUntil)} giorni` : 
+                            ${delivery.stato === 'pendente' ? '🟣 Pendente' :
+                              daysUntil < 0 ? `⚠️ In ritardo di ${Math.abs(daysUntil)} giorni` : 
                               daysUntil === 0 ? '🔔 Consegna oggi!' :
                               daysUntil === 1 ? '⏰ Consegna domani' :
                               `Tra ${daysUntil} giorni`}
@@ -1428,7 +1683,7 @@
                 
                 switch(event.tipo) {
                     case 'inserimento':
-                        tipoLabel = 'Inserimento Unità';
+                        tipoLabel = 'Nuova Consegna';
                         tipoClass = 'evento-inserimento';
                         icona = '🔑';
                         break;
@@ -1438,10 +1693,75 @@
                         icona = '📝';
                         break;
                     case 'consegna':
-                        tipoLabel = 'Consegna Completata';
-                        tipoClass = 'evento-consegna';
-                        icona = '✅';
+                        // Check dettagli for specific status
+                        if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come da consegnare')) {
+                            tipoLabel = 'Impostato Da consegnare';
+                            tipoClass = 'evento-da-consegnare';
+                            icona = '🔄🟠';
+                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come pendente')) {
+                            tipoLabel = 'Impostato Pendente';
+                            tipoClass = 'evento-pendente';
+                            icona = '🔄🟣';
+                        } else if (event.dettagli && (event.dettagli.toLowerCase().includes('cancellata') || event.dettagli.toLowerCase().includes('eliminata') || event.dettagli.toLowerCase().includes('annullata'))) {
+                            tipoLabel = 'Cancellata';
+                            tipoClass = 'evento-cancellata';
+                            icona = '🔑❌';
+                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('nuova consegna')) {
+                            tipoLabel = 'Nuova Consegna';
+                            tipoClass = 'evento-inserimento';
+                            icona = '🔑';
+                        } else {
+                            tipoLabel = 'Consegnata';
+                            tipoClass = 'evento-consegna';
+                            icona = '🔑✅';
+                        }
                         break;
+                    case 'modifica':
+                        tipoLabel = 'Modifica';
+                        tipoClass = 'evento-modifica';
+                        icona = '✏️';
+                        break;
+                    case 'eliminazione':
+                        tipoLabel = 'Cancellata';
+                        tipoClass = 'evento-cancellata';
+                        icona = '🔑❌';
+                        break;
+                    case 'da_consegnare':
+                        tipoLabel = 'Da Consegnare';
+                        tipoClass = 'evento-da-consegnare';
+                        icona = '🟠';
+                        break;
+                    default:
+                        // Check dettagli for context - more specific checks first
+                        if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come da consegnare')) {
+                            tipoLabel = 'Impostato Da consegnare';
+                            tipoClass = 'evento-da-consegnare';
+                            icona = '🔄🟠';
+                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come pendente')) {
+                            tipoLabel = 'Impostato Pendente';
+                            tipoClass = 'evento-pendente';
+                            icona = '🔄🟣';
+                        } else if (event.dettagli && (event.dettagli.toLowerCase().includes('cancellata') || event.dettagli.toLowerCase().includes('eliminata') || event.dettagli.toLowerCase().includes('annullata'))) {
+                            tipoLabel = 'Cancellata';
+                            tipoClass = 'evento-cancellata';
+                            icona = '🔑❌';
+                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('nuova consegna')) {
+                            tipoLabel = 'Nuova Consegna';
+                            tipoClass = 'evento-inserimento';
+                            icona = '🔑';
+                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('modific')) {
+                            tipoLabel = 'Modifica';
+                            tipoClass = 'evento-modifica';
+                            icona = '✏️';
+                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('consegnata')) {
+                            tipoLabel = 'Consegnata';
+                            tipoClass = 'evento-consegna';
+                            icona = '🔑✅';
+                        } else {
+                            tipoLabel = 'Attività';
+                            tipoClass = 'evento-inserimento';
+                            icona = '📋';
+                        }
                 }
                 
                 const dataFormattata = formatDateTime(new Date(event.timestamp));
@@ -1525,17 +1845,43 @@
                     </div>
                 `;
             } else {
-                const keysIcon = '🔑';
-                
                 listContainer.innerHTML = dayDeliveries.map(delivery => {
                     const deliveryClass = getDeliveryClass(delivery);
-                    const statusIcon = delivery.completedDate ? '✓' : keysIcon;
                     const statusText = delivery.completedDate ? 'Consegnata' : 'Consegna prevista';
+                    
+                    // Determine badge and icon
+                    let badgeHtml = '';
+                    let unitIcon = '🔑';
+                    
+                    if (delivery.completedDate) {
+                        unitIcon = '🔑✅';
+                        badgeHtml = `
+                            <div class="completed-badge">
+                                <span class="check-icon-box">✓</span>
+                                <span>CONSEGNATO</span>
+                            </div>
+                        `;
+                    } else if (delivery.stato === 'pendente') {
+                        unitIcon = '🔑🟣';
+                        badgeHtml = `
+                            <div class="status-badge pendente">
+                                <span class="status-icon-box purple">●</span>
+                                <span>PENDENTE</span>
+                            </div>
+                        `;
+                    } else {
+                        badgeHtml = `
+                            <div class="status-badge in-consegna">
+                                <span class="status-icon-box orange">●</span>
+                                <span>IN CONSEGNA</span>
+                            </div>
+                        `;
+                    }
                     
                     return `
                         <div class="day-delivery-item ${deliveryClass}" onclick="showDetailsFromDay('${delivery.id}')">
                             <div class="delivery-header">
-                                <span class="unit-name">${statusIcon} ${delivery.unitName}</span>
+                                <span class="unit-name">${unitIcon} ${delivery.unitName}</span>
                             </div>
                             <div class="delivery-date">
                                 ${delivery.completedDate ? 
@@ -1543,6 +1889,7 @@
                                     `<small>${statusText}</small>`
                                 }
                             </div>
+                            ${badgeHtml}
                         </div>
                     `;
                 }).join('');
