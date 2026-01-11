@@ -243,6 +243,29 @@
             background: #f3e5f5;
         }
 
+        .date-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            padding: 12px 5px 8px;
+            margin-top: 5px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+
+        .date-header.completed {
+            color: #666;
+        }
+
+        .section-divider {
+            font-size: 16px;
+            font-weight: 700;
+            color: #4CAF50;
+            padding: 20px 5px 10px;
+            margin-top: 15px;
+            border-top: 3px solid #4CAF50;
+            text-align: center;
+        }
+
         .delivery-header {
             display: flex;
             justify-content: space-between;
@@ -701,6 +724,16 @@
         .registro-item:hover {
             transform: translateX(5px);
             box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+
+        .registro-date-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: #333;
+            padding: 12px 5px 8px;
+            margin-top: 5px;
+            border-bottom: 2px solid #e0e0e0;
+            background: #fafafa;
         }
 
         .registro-item.evento-inserimento {
@@ -1379,66 +1412,162 @@
                 return;
             }
 
-            list.innerHTML = deliveriesToRender.map(delivery => {
-                const deliveryClass = getDeliveryClass(delivery);
-                const daysUntil = getDaysUntil(delivery.deliveryDate);
-                let statusText = '';
-                
-                if (delivery.completedDate) {
-                    statusText = `Consegnata il ${formatDate(delivery.completedDate)}`;
-                } else if (daysUntil < 0) {
-                    statusText = `⚠️ In ritardo di ${Math.abs(daysUntil)} giorni`;
-                } else if (daysUntil === 0) {
-                    statusText = '🔔 Oggi!';
-                } else if (daysUntil === 1) {
-                    statusText = '⏰ Domani';
-                } else {
-                    statusText = `Tra ${daysUntil} giorni`;
+            // Separate active and completed deliveries
+            const activeDeliveries = deliveriesToRender.filter(d => !d.completedDate);
+            const completedDeliveries = deliveriesToRender.filter(d => d.completedDate);
+            
+            // Sort active by delivery date
+            activeDeliveries.sort((a, b) => new Date(a.deliveryDate) - new Date(b.deliveryDate));
+            
+            // Sort completed by completion date (most recent first)
+            completedDeliveries.sort((a, b) => new Date(b.completedDate) - new Date(a.completedDate));
+            
+            // Group active deliveries by date
+            const groupedActive = {};
+            activeDeliveries.forEach(delivery => {
+                const dateKey = delivery.deliveryDate;
+                if (!groupedActive[dateKey]) {
+                    groupedActive[dateKey] = [];
                 }
-
-                // Determine badge based on status
-                let badgeHtml = '';
-                let unitIcon = '🔑';
-                
-                if (delivery.completedDate) {
-                    unitIcon = '🔑✅';
-                    badgeHtml = `
-                        <div class="completed-badge">
-                            <span class="check-icon-box">✓</span>
-                            <span>CONSEGNATO</span>
-                        </div>
-                    `;
-                } else if (delivery.stato === 'pendente') {
-                    unitIcon = '🔑🟣';
-                    badgeHtml = `
-                        <div class="status-badge pendente">
-                            <span class="status-icon-box purple">●</span>
-                            <span>PENDENTE</span>
-                        </div>
-                    `;
-                } else {
-                    badgeHtml = `
-                        <div class="status-badge in-consegna">
-                            <span class="status-icon-box orange">●</span>
-                            <span>IN CONSEGNA</span>
-                        </div>
-                    `;
+                groupedActive[dateKey].push(delivery);
+            });
+            
+            // Group completed deliveries by completion date
+            const groupedCompleted = {};
+            completedDeliveries.forEach(delivery => {
+                const dateKey = delivery.completedDate.split('T')[0];
+                if (!groupedCompleted[dateKey]) {
+                    groupedCompleted[dateKey] = [];
                 }
+                groupedCompleted[dateKey].push(delivery);
+            });
+            
+            let html = '';
+            
+            // Render active deliveries grouped by date
+            const sortedActiveDates = Object.keys(groupedActive).sort((a, b) => new Date(a) - new Date(b));
+            sortedActiveDates.forEach(dateKey => {
+                const dateLabel = getDateLabel(dateKey);
+                html += `<div class="date-header">${dateLabel}</div>`;
+                
+                groupedActive[dateKey].forEach(delivery => {
+                    html += renderDeliveryCard(delivery);
+                });
+            });
+            
+            // Render completed deliveries grouped by date
+            if (completedDeliveries.length > 0) {
+                html += `<div class="section-divider">✅ Consegnate</div>`;
+                
+                const sortedCompletedDates = Object.keys(groupedCompleted).sort((a, b) => new Date(b) - new Date(a));
+                sortedCompletedDates.forEach(dateKey => {
+                    const dateLabel = getDateLabelCompleted(dateKey);
+                    html += `<div class="date-header completed">${dateLabel}</div>`;
+                    
+                    groupedCompleted[dateKey].forEach(delivery => {
+                        html += renderDeliveryCard(delivery);
+                    });
+                });
+            }
+            
+            list.innerHTML = html;
+        }
+        
+        function getDateLabel(dateStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const date = new Date(dateStr);
+            date.setHours(0, 0, 0, 0);
+            
+            const diffDays = Math.round((date - today) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays < 0) {
+                return `⚠️ In ritardo - ${formatDate(dateStr)}`;
+            } else if (diffDays === 0) {
+                return `🔔 Oggi - ${formatDate(dateStr)}`;
+            } else if (diffDays === 1) {
+                return `⏰ Domani - ${formatDate(dateStr)}`;
+            } else {
+                return `📅 ${formatDate(dateStr)}`;
+            }
+        }
+        
+        function getDateLabelCompleted(dateStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const date = new Date(dateStr);
+            date.setHours(0, 0, 0, 0);
+            
+            const diffDays = Math.round((today - date) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return `Oggi - ${formatDate(dateStr)}`;
+            } else if (diffDays === 1) {
+                return `Ieri - ${formatDate(dateStr)}`;
+            } else {
+                return formatDate(dateStr);
+            }
+        }
+        
+        function renderDeliveryCard(delivery) {
+            const deliveryClass = getDeliveryClass(delivery);
+            const daysUntil = getDaysUntil(delivery.deliveryDate);
+            let statusText = '';
+            
+            if (delivery.completedDate) {
+                statusText = `Consegnata il ${formatDate(delivery.completedDate)}`;
+            } else if (daysUntil < 0) {
+                statusText = `⚠️ In ritardo di ${Math.abs(daysUntil)} giorni`;
+            } else if (daysUntil === 0) {
+                statusText = '🔔 Oggi!';
+            } else if (daysUntil === 1) {
+                statusText = '⏰ Domani';
+            } else {
+                statusText = `Tra ${daysUntil} giorni`;
+            }
 
-                return `
-                    <div class="delivery-card ${deliveryClass}" onclick="showDetails('${delivery.id}')">
-                        <div class="delivery-header">
-                            <span class="unit-name">${unitIcon} ${delivery.unitName}</span>
-                        </div>
-                        <div class="delivery-date">
-                            <strong>Consegna:</strong> ${formatDate(delivery.deliveryDate)}
-                            <br>
-                            <small>${statusText}</small>
-                        </div>
-                        ${badgeHtml}
+            // Determine badge based on status
+            let badgeHtml = '';
+            let unitIcon = '🔑';
+            
+            if (delivery.completedDate) {
+                unitIcon = '🔑✅';
+                badgeHtml = `
+                    <div class="completed-badge">
+                        <span class="check-icon-box">✓</span>
+                        <span>CONSEGNATO</span>
                     </div>
                 `;
-            }).join('');
+            } else if (delivery.stato === 'pendente') {
+                unitIcon = '🔑🟣';
+                badgeHtml = `
+                    <div class="status-badge pendente">
+                        <span class="status-icon-box purple">●</span>
+                        <span>PENDENTE</span>
+                    </div>
+                `;
+            } else {
+                badgeHtml = `
+                    <div class="status-badge in-consegna">
+                        <span class="status-icon-box orange">●</span>
+                        <span>IN CONSEGNA</span>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="delivery-card ${deliveryClass}" onclick="showDetails('${delivery.id}')">
+                    <div class="delivery-header">
+                        <span class="unit-name">${unitIcon} ${delivery.unitName}</span>
+                    </div>
+                    <div class="delivery-date">
+                        <strong>Consegna:</strong> ${formatDate(delivery.deliveryDate)}
+                        <br>
+                        <small>${statusText}</small>
+                    </div>
+                    ${badgeHtml}
+                </div>
+            `;
         }
 
         function showDetails(id) {
@@ -1676,109 +1805,151 @@
             // Sort by date (most recent first)
             const sortedLog = [...logToDisplay].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
             
-            registroList.innerHTML = sortedLog.map(event => {
-                let tipoLabel = '';
-                let tipoClass = '';
-                let icona = '';
+            // Group by date
+            const groupedByDate = {};
+            sortedLog.forEach(event => {
+                const dateKey = new Date(event.timestamp).toISOString().split('T')[0];
+                if (!groupedByDate[dateKey]) {
+                    groupedByDate[dateKey] = [];
+                }
+                groupedByDate[dateKey].push(event);
+            });
+            
+            let html = '';
+            const sortedDates = Object.keys(groupedByDate).sort((a, b) => new Date(b) - new Date(a));
+            
+            sortedDates.forEach(dateKey => {
+                const dateLabel = getDateLabelRegistro(dateKey);
+                html += `<div class="registro-date-header">${dateLabel}</div>`;
                 
-                switch(event.tipo) {
-                    case 'inserimento':
-                        tipoLabel = 'Nuova Consegna';
-                        tipoClass = 'evento-inserimento';
-                        icona = '🔑';
-                        break;
-                    case 'nota_aggiunta':
-                        tipoLabel = 'Aggiunta Nota';
-                        tipoClass = 'evento-inserimento';
-                        icona = '📝';
-                        break;
-                    case 'consegna':
-                        // Check dettagli for specific status
-                        if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come da consegnare')) {
-                            tipoLabel = 'Impostato Da consegnare';
-                            tipoClass = 'evento-da-consegnare';
-                            icona = '🔄🟠';
-                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come pendente')) {
-                            tipoLabel = 'Impostato Pendente';
-                            tipoClass = 'evento-pendente';
-                            icona = '🔄🟣';
-                        } else if (event.dettagli && (event.dettagli.toLowerCase().includes('cancellata') || event.dettagli.toLowerCase().includes('eliminata') || event.dettagli.toLowerCase().includes('annullata'))) {
-                            tipoLabel = 'Cancellata';
-                            tipoClass = 'evento-cancellata';
-                            icona = '🔑❌';
-                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('nuova consegna')) {
-                            tipoLabel = 'Nuova Consegna';
-                            tipoClass = 'evento-inserimento';
-                            icona = '🔑';
-                        } else {
-                            tipoLabel = 'Consegnata';
-                            tipoClass = 'evento-consegna';
-                            icona = '🔑✅';
-                        }
-                        break;
-                    case 'modifica':
-                        tipoLabel = 'Modifica';
-                        tipoClass = 'evento-modifica';
-                        icona = '✏️';
-                        break;
-                    case 'eliminazione':
+                groupedByDate[dateKey].forEach(event => {
+                    html += renderRegistroItem(event);
+                });
+            });
+            
+            registroList.innerHTML = html;
+        }
+        
+        function getDateLabelRegistro(dateStr) {
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const date = new Date(dateStr);
+            date.setHours(0, 0, 0, 0);
+            
+            const diffDays = Math.round((today - date) / (1000 * 60 * 60 * 24));
+            
+            if (diffDays === 0) {
+                return `📅 Oggi - ${formatDate(dateStr)}`;
+            } else if (diffDays === 1) {
+                return `📅 Ieri - ${formatDate(dateStr)}`;
+            } else {
+                return `📅 ${formatDate(dateStr)}`;
+            }
+        }
+        
+        function renderRegistroItem(event) {
+            let tipoLabel = '';
+            let tipoClass = '';
+            let icona = '';
+            
+            switch(event.tipo) {
+                case 'inserimento':
+                    tipoLabel = 'Nuova Consegna';
+                    tipoClass = 'evento-inserimento';
+                    icona = '🔑';
+                    break;
+                case 'nota_aggiunta':
+                    tipoLabel = 'Aggiunta Nota';
+                    tipoClass = 'evento-inserimento';
+                    icona = '📝';
+                    break;
+                case 'consegna':
+                    // Check dettagli for specific status
+                    if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come da consegnare')) {
+                        tipoLabel = 'Impostato Da consegnare';
+                        tipoClass = 'evento-da-consegnare';
+                        icona = '🔄🟠';
+                    } else if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come pendente')) {
+                        tipoLabel = 'Impostato Pendente';
+                        tipoClass = 'evento-pendente';
+                        icona = '🔄🟣';
+                    } else if (event.dettagli && (event.dettagli.toLowerCase().includes('cancellata') || event.dettagli.toLowerCase().includes('eliminata') || event.dettagli.toLowerCase().includes('annullata'))) {
                         tipoLabel = 'Cancellata';
                         tipoClass = 'evento-cancellata';
                         icona = '🔑❌';
-                        break;
-                    case 'da_consegnare':
-                        tipoLabel = 'Da Consegnare';
+                    } else if (event.dettagli && event.dettagli.toLowerCase().includes('nuova consegna')) {
+                        tipoLabel = 'Nuova Consegna';
+                        tipoClass = 'evento-inserimento';
+                        icona = '🔑';
+                    } else {
+                        tipoLabel = 'Consegnata';
+                        tipoClass = 'evento-consegna';
+                        icona = '🔑✅';
+                    }
+                    break;
+                case 'modifica':
+                    tipoLabel = 'Modifica';
+                    tipoClass = 'evento-modifica';
+                    icona = '✏️';
+                    break;
+                case 'eliminazione':
+                    tipoLabel = 'Cancellata';
+                    tipoClass = 'evento-cancellata';
+                    icona = '🔑❌';
+                    break;
+                case 'da_consegnare':
+                    tipoLabel = 'Da Consegnare';
+                    tipoClass = 'evento-da-consegnare';
+                    icona = '🟠';
+                    break;
+                default:
+                    // Check dettagli for context - more specific checks first
+                    if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come da consegnare')) {
+                        tipoLabel = 'Impostato Da consegnare';
                         tipoClass = 'evento-da-consegnare';
-                        icona = '🟠';
-                        break;
-                    default:
-                        // Check dettagli for context - more specific checks first
-                        if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come da consegnare')) {
-                            tipoLabel = 'Impostato Da consegnare';
-                            tipoClass = 'evento-da-consegnare';
-                            icona = '🔄🟠';
-                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come pendente')) {
-                            tipoLabel = 'Impostato Pendente';
-                            tipoClass = 'evento-pendente';
-                            icona = '🔄🟣';
-                        } else if (event.dettagli && (event.dettagli.toLowerCase().includes('cancellata') || event.dettagli.toLowerCase().includes('eliminata') || event.dettagli.toLowerCase().includes('annullata'))) {
-                            tipoLabel = 'Cancellata';
-                            tipoClass = 'evento-cancellata';
-                            icona = '🔑❌';
-                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('nuova consegna')) {
-                            tipoLabel = 'Nuova Consegna';
-                            tipoClass = 'evento-inserimento';
-                            icona = '🔑';
-                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('modific')) {
-                            tipoLabel = 'Modifica';
-                            tipoClass = 'evento-modifica';
-                            icona = '✏️';
-                        } else if (event.dettagli && event.dettagli.toLowerCase().includes('consegnata')) {
-                            tipoLabel = 'Consegnata';
-                            tipoClass = 'evento-consegna';
-                            icona = '🔑✅';
-                        } else {
-                            tipoLabel = 'Attività';
-                            tipoClass = 'evento-inserimento';
-                            icona = '📋';
-                        }
-                }
-                
-                const dataFormattata = formatDateTime(new Date(event.timestamp));
-                
-                return `
-                    <div class="registro-item ${tipoClass}">
-                        <div class="registro-header">
-                            <span class="registro-tipo">${icona} ${tipoLabel}</span>
-                            <span class="registro-data">${dataFormattata}</span>
-                        </div>
-                        <div class="registro-dettagli">
-                            <span class="registro-unita">${event.unita}</span><br>
-                            ${event.dettagli}
-                        </div>
+                        icona = '🔄🟠';
+                    } else if (event.dettagli && event.dettagli.toLowerCase().includes('impostata come pendente')) {
+                        tipoLabel = 'Impostato Pendente';
+                        tipoClass = 'evento-pendente';
+                        icona = '🔄🟣';
+                    } else if (event.dettagli && (event.dettagli.toLowerCase().includes('cancellata') || event.dettagli.toLowerCase().includes('eliminata') || event.dettagli.toLowerCase().includes('annullata'))) {
+                        tipoLabel = 'Cancellata';
+                        tipoClass = 'evento-cancellata';
+                        icona = '🔑❌';
+                    } else if (event.dettagli && event.dettagli.toLowerCase().includes('nuova consegna')) {
+                        tipoLabel = 'Nuova Consegna';
+                        tipoClass = 'evento-inserimento';
+                        icona = '🔑';
+                    } else if (event.dettagli && event.dettagli.toLowerCase().includes('modific')) {
+                        tipoLabel = 'Modifica';
+                        tipoClass = 'evento-modifica';
+                        icona = '✏️';
+                    } else if (event.dettagli && event.dettagli.toLowerCase().includes('consegnata')) {
+                        tipoLabel = 'Consegnata';
+                        tipoClass = 'evento-consegna';
+                        icona = '🔑✅';
+                    } else {
+                        tipoLabel = 'Attività';
+                        tipoClass = 'evento-inserimento';
+                        icona = '📋';
+                    }
+            }
+            
+            const time = new Date(event.timestamp);
+            const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}`;
+            
+            return `
+                <div class="registro-item ${tipoClass}">
+                    <div class="registro-header">
+                        <span class="registro-tipo">${icona} ${tipoLabel}</span>
+                        <span class="registro-data">${timeStr}</span>
                     </div>
-                `;
-            }).join('');
+                    <div class="registro-dettagli">
+                        <span class="registro-unita">${event.unita}</span><br>
+                        ${event.dettagli}
+                    </div>
+                </div>
+            `;
         }
 
         function filterRegistro() {
