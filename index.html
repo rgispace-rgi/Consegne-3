@@ -1058,7 +1058,79 @@
             from { transform: rotate(0deg); }
             to { transform: rotate(360deg); }
         }
+
+        /* Login Firebase */
+        .login-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 5000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-overlay.show {
+            display: flex;
+        }
+
+        .login-box {
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+            padding: 30px 25px;
+            width: 100%;
+            max-width: 360px;
+            text-align: center;
+        }
+
+        .login-box h2 {
+            font-size: 20px;
+            color: #333;
+            margin: 8px 0 20px;
+        }
+
+        .login-box input {
+            width: 100%;
+            padding: 12px 15px;
+            margin-bottom: 12px;
+            border: 2px solid #ddd;
+            border-radius: 10px;
+            font-size: 16px;
+        }
+
+        .login-box input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .login-box button {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .login-box button:disabled {
+            opacity: 0.6;
+        }
+
+        .login-error {
+            color: #e53935;
+            font-size: 14px;
+            min-height: 20px;
+            margin-bottom: 8px;
+        }
     </style>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js"></script>
 </head>
 <body>
     <div class="container">
@@ -1069,7 +1141,7 @@
                 <div style="font-size: 16px; line-height: 1.2;">Immobili</div>
             </h1>
             <div class="header-buttons">
-                <button class="btn-registro" onclick="autoSync(true)" title="Aggiorna da Google Sheets">🔄</button>
+                <button class="btn-registro" onclick="logout()" title="Esci">🚪</button>
                 <button class="btn-registro" onclick="openRegistro()">📋 Registro</button>
                 <button class="btn-calendar" onclick="openCalendar()">📅 Calendario</button>
             </div>
@@ -1157,11 +1229,31 @@
         <div class="message">Dati sincronizzati!</div>
     </div>
 
+    <div class="login-overlay" id="loginOverlay">
+        <form class="login-box" onsubmit="login(event)">
+            <div style="font-size: 40px;">🏠</div>
+            <h2>Consegne Immobili</h2>
+            <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required>
+            <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
+            <div class="login-error" id="loginError"></div>
+            <button type="submit" id="loginButton">Accedi</button>
+        </form>
+    </div>
+
     <script>
         // ============================================
-        // GOOGLE SHEETS API
+        // FIREBASE (stesso progetto della PWA gestione-interventi)
         // ============================================
-        const WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbx7lrmOwf2GebxItnwgWCMCrYR4GVa9AjwzeaqPnLOloFWc9C_gvdG4TqpjpKHRMJo/exec';
+        firebase.initializeApp({
+            apiKey: "AIzaSyA-tTa96I8g3TJYyP8DEvencLExErZSmkQ",
+            authDomain: "gestione-interventi-3ef9c.firebaseapp.com",
+            projectId: "gestione-interventi-3ef9c",
+            storageBucket: "gestione-interventi-3ef9c.firebasestorage.app",
+            messagingSenderId: "644546550873",
+            appId: "1:644546550873:web:bb7f0994e397d9f501a548"
+        });
+        const fbAuth = firebase.auth();
+        const fbDB = firebase.firestore();
         
         let deliveries = [];
         let activityLog = [];
@@ -1174,60 +1266,134 @@
 
         const DATA_VERSION = 27; // Incrementa per forzare reset dati
 
-        // Load data from Google Sheets
-        async function loadFromGoogle() {
-            // Show loading feedback
-            showLoadingFeedback();
-            
-            try {
-                const response = await fetch(`${WEBAPP_URL}?action=getData`, { signal: AbortSignal.timeout(90000) });
-                const result = await response.json();
-                
-                if (result && result.consegne) {
-                    deliveries = result.consegne.map(c => ({
-                        id: c.id,
-                        unitName: c.unitName,
-                        deliveryDate: c.deliveryDate,
-                        oraConsegna: c.oraConsegna || '',
-                        createdDate: c.dataInserimento || new Date().toISOString(),
-                        notes: c.note || '',
-                        completedDate: c.completedDate || null,
-                        stato: c.stato || 'da_consegnare'
+        // Dati da Firestore (progetto gestione-interventi), aggiornati in tempo reale
+        let fsConsegne = null;
+        let fsRegistro = null;
+
+        function tsToIso(v) {
+            return (v && v.toDate) ? v.toDate().toISOString() : v;
+        }
+
+        function applyFirestoreData() {
+            if (!fsConsegne) return;
+
+            deliveries = fsConsegne.map(c => ({
+                id: c.id,
+                unitName: c.unitName || '',
+                deliveryDate: c.deliveryDate,
+                oraConsegna: c.oraConsegna || '',
+                createdDate: c.dataInserimento || tsToIso(c.createdAt) || new Date().toISOString(),
+                notes: c.note || '',
+                completedDate: c.completedDate || null,
+                stato: c.stato || 'da_consegnare'
+            }));
+
+            // Registro: solo le attività legate alle consegne
+            if (fsRegistro) {
+                const consegneUnits = deliveries.map(d => String(d.unitName).toLowerCase());
+                activityLog = fsRegistro
+                    .filter(r => {
+                        if (r.tipo === 'consegna') return true;
+                        if (r.dettagli && String(r.dettagli).toLowerCase().includes('consegna')) return true;
+                        if (r.unita && consegneUnits.includes(String(r.unita).toLowerCase())) return true;
+                        return false;
+                    })
+                    .map(r => ({
+                        tipo: r.tipo,
+                        timestamp: tsToIso(r.timestamp),
+                        unita: r.unita,
+                        dettagli: r.dettagli
                     }));
-                    
-                    // Get list of consegne unit names for filtering
-                    const consegneUnits = deliveries.map(d => d.unitName.toLowerCase());
-                    
-                    // Load registro - ONLY consegne-related activities
-                    if (result.registro) {
-                        activityLog = result.registro
-                            .filter(r => {
-                                if (r.tipo === 'consegna') return true;
-                                if (r.dettagli && r.dettagli.toLowerCase().includes('consegna')) return true;
-                                if (r.unita && consegneUnits.includes(r.unita.toLowerCase())) return true;
-                                return false;
-                            })
-                            .map(r => ({
-                                tipo: r.tipo,
-                                timestamp: r.timestamp,
-                                unita: r.unita,
-                                dettagli: r.dettagli
-                            }));
-                    }
-                    
-                    saveToLocalStorage();
-                    renderDeliveries();
-                    console.log('✅ Dati caricati da Google Sheets:', deliveries.length, 'consegne');
-                    showSyncFeedback();
-                    return true;
-                }
-                hideLoadingFeedback();
-                return false;
-            } catch (error) {
-                console.error('Errore caricamento da Google:', error);
-                hideLoadingFeedback();
-                return false;
             }
+
+            saveToLocalStorage();
+            if (document.getElementById('searchInput').value.trim()) {
+                filterDeliveries();
+            } else {
+                renderDeliveries();
+            }
+            if (document.getElementById('registroModal').style.display === 'block') {
+                filterRegistro();
+            }
+            if (document.getElementById('calendarModal').style.display === 'block') {
+                renderCalendar();
+            }
+        }
+
+        let unsubConsegne = null;
+        let unsubRegistro = null;
+
+        function startListeners() {
+            showLoadingFeedback();
+            let firstLoad = true;
+            unsubConsegne = fbDB.collection('consegne').onSnapshot(snap => {
+                fsConsegne = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                applyFirestoreData();
+                if (firstLoad) {
+                    firstLoad = false;
+                    showSyncFeedback();
+                }
+            }, err => {
+                console.error('Errore lettura consegne:', err);
+                showSyncError();
+            });
+            unsubRegistro = fbDB.collection('registro').onSnapshot(snap => {
+                fsRegistro = snap.docs.map(d => d.data());
+                applyFirestoreData();
+            }, err => {
+                console.error('Errore lettura registro:', err);
+            });
+        }
+
+        function stopListeners() {
+            if (unsubConsegne) unsubConsegne();
+            if (unsubRegistro) unsubRegistro();
+            unsubConsegne = unsubRegistro = null;
+            fsConsegne = fsRegistro = null;
+        }
+
+        // Username → email come nella PWA gestione-interventi
+        const USERNAME_EMAIL_MAP = {
+            'hennadiy': 'rgispace@gmail.com'
+        };
+
+        function usernameToEmail(username) {
+            const u = username.toLowerCase().trim();
+            if (u.includes('@')) return u;
+            return USERNAME_EMAIL_MAP[u] || `${u}@gestione-interventi.local`;
+        }
+
+        async function login(event) {
+            event.preventDefault();
+            const button = document.getElementById('loginButton');
+            const error = document.getElementById('loginError');
+            error.textContent = '';
+            button.disabled = true;
+            try {
+                await fbAuth.signInWithEmailAndPassword(
+                    usernameToEmail(document.getElementById('loginUsername').value),
+                    document.getElementById('loginPassword').value
+                );
+                document.getElementById('loginPassword').value = '';
+            } catch (e) {
+                console.error('Login fallito:', e);
+                error.textContent = (e.code === 'auth/network-request-failed')
+                    ? 'Nessuna connessione, riprova'
+                    : 'Username o password errati';
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        function logout() {
+            if (!confirm('Uscire?')) return;
+            stopListeners();
+            deliveries = [];
+            activityLog = [];
+            localStorage.removeItem('deliveries');
+            localStorage.removeItem('activityLog');
+            renderDeliveries();
+            fbAuth.signOut();
         }
 
         // Show loading feedback with spinning hourglass
@@ -1253,7 +1419,7 @@
             feedback.classList.remove('loading');
             feedback.innerHTML = `
                 <div class="icon">⚠️</div>
-                <div class="message">Aggiornamento non riuscito, riprova con 🔄</div>
+                <div class="message">Impossibile leggere i dati, ricarica la pagina</div>
             `;
             feedback.classList.add('show');
             setTimeout(() => {
@@ -2303,34 +2469,16 @@
         // Initialize
         renderDeliveries();
 
-        // Aggiornamento automatico da Google Sheets: all'apertura e quando
-        // si torna sulla pagina (max una volta al minuto). Lo script Google
-        // a volte risponde 404 o va in timeout: si riprova fino a 4 volte.
-        let lastAutoSync = 0;
-        let autoSyncRunning = false;
-        async function autoSync(force) {
-            if (autoSyncRunning) return;
-            if (!force && Date.now() - lastAutoSync < 60000) return;
-            autoSyncRunning = true;
-            try {
-                for (let tentativo = 1; tentativo <= 4; tentativo++) {
-                    if (await loadFromGoogle()) {
-                        lastAutoSync = Date.now();
-                        return;
-                    }
-                    await new Promise(r => setTimeout(r, 3000));
-                }
-                showSyncError();
-            } finally {
-                autoSyncRunning = false;
+        // Avvio: login Firebase (la sessione resta salvata nel browser)
+        fbAuth.onAuthStateChanged(user => {
+            const overlay = document.getElementById('loginOverlay');
+            if (user) {
+                overlay.classList.remove('show');
+                if (!unsubConsegne) startListeners();
+            } else {
+                stopListeners();
+                overlay.classList.add('show');
             }
-        }
-        autoSync();
-        document.addEventListener('visibilitychange', () => {
-            if (document.visibilityState === 'visible') autoSync();
-        });
-        window.addEventListener('pageshow', (e) => {
-            if (e.persisted) autoSync();
         });
     </script>
 </body>
