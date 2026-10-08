@@ -1069,7 +1069,7 @@
                 <div style="font-size: 16px; line-height: 1.2;">Immobili</div>
             </h1>
             <div class="header-buttons">
-                <button class="btn-registro" onclick="loadFromGoogle()" title="Aggiorna da Google Sheets">🔄</button>
+                <button class="btn-registro" onclick="autoSync(true)" title="Aggiorna da Google Sheets">🔄</button>
                 <button class="btn-registro" onclick="openRegistro()">📋 Registro</button>
                 <button class="btn-calendar" onclick="openCalendar()">📅 Calendario</button>
             </div>
@@ -1172,7 +1172,7 @@
         let storicoAutoCloseTimer = null;
         const STORICO_AUTO_CLOSE_DELAY = 5000; // 5 secondi di inattività
 
-        const DATA_VERSION = 26; // Incrementa per forzare reset dati
+        const DATA_VERSION = 27; // Incrementa per forzare reset dati
 
         // Load data from Google Sheets
         async function loadFromGoogle() {
@@ -1180,7 +1180,7 @@
             showLoadingFeedback();
             
             try {
-                const response = await fetch(`${WEBAPP_URL}?action=getData`);
+                const response = await fetch(`${WEBAPP_URL}?action=getData`, { signal: AbortSignal.timeout(90000) });
                 const result = await response.json();
                 
                 if (result && result.consegne) {
@@ -1245,6 +1245,20 @@
         function hideLoadingFeedback() {
             const feedback = document.getElementById('syncFeedback');
             feedback.classList.remove('show', 'loading');
+        }
+
+        // Show sync error popup (dati mostrati = ultima copia salvata)
+        function showSyncError() {
+            const feedback = document.getElementById('syncFeedback');
+            feedback.classList.remove('loading');
+            feedback.innerHTML = `
+                <div class="icon">⚠️</div>
+                <div class="message">Aggiornamento non riuscito, riprova con 🔄</div>
+            `;
+            feedback.classList.add('show');
+            setTimeout(() => {
+                feedback.classList.remove('show');
+            }, 4000);
         }
 
         // Show sync feedback popup
@@ -2289,141 +2303,35 @@
         // Initialize
         renderDeliveries();
 
-        // Add some demo data if empty
-        if (deliveries.length === 0) {
-            // Initialize deliveries
-            deliveries = [
-                {
-                    id: '1',
-                    unitName: 'Stoccaggio 50',
-                    deliveryDate: '2026-01-13',
-                    createdDate: '2025-12-20T10:00:00',
-                    notes: 'Piano cottura e il lavello',
-                    completedDate: null
-                },
-                {
-                    id: '2',
-                    unitName: 'LungaMarcia 14',
-                    deliveryDate: '2026-01-15',
-                    createdDate: '2025-12-29T14:00:00',
-                    notes: 'Piano cottura e il lavello',
-                    completedDate: null
-                },
-                {
-                    id: '3',
-                    unitName: 'Beach 21',
-                    deliveryDate: '2026-01-15',
-                    createdDate: '2025-12-29T14:05:00',
-                    notes: 'Piano cottura e il lavello',
-                    completedDate: null
-                },
-                {
-                    id: '4',
-                    unitName: 'Montacarichi 1',
-                    deliveryDate: '2026-01-20',
-                    createdDate: '2025-12-29T14:10:00',
-                    notes: '',
-                    completedDate: null
-                },
-                {
-                    id: '5',
-                    unitName: 'Silos 13',
-                    deliveryDate: '2026-01-09',
-                    createdDate: '2025-12-29T15:00:00',
-                    notes: 'Piano cottura e il lavello',
-                    completedDate: null
-                },
-                {
-                    id: '6',
-                    unitName: 'Fabbrica 15',
-                    deliveryDate: '2026-01-08',
-                    createdDate: '2025-12-29T15:30:00',
-                    notes: 'Piano cottura e il lavello',
-                    completedDate: null
-                },
-                {
-                    id: '7',
-                    unitName: 'Cemento Armato',
-                    deliveryDate: '2026-01-22',
-                    createdDate: '2025-12-30T16:30:00',
-                    notes: '',
-                    completedDate: null
+        // Aggiornamento automatico da Google Sheets: all'apertura e quando
+        // si torna sulla pagina (max una volta al minuto). Lo script Google
+        // a volte risponde 404 o va in timeout: si riprova fino a 4 volte.
+        let lastAutoSync = 0;
+        let autoSyncRunning = false;
+        async function autoSync(force) {
+            if (autoSyncRunning) return;
+            if (!force && Date.now() - lastAutoSync < 60000) return;
+            autoSyncRunning = true;
+            try {
+                for (let tentativo = 1; tentativo <= 4; tentativo++) {
+                    if (await loadFromGoogle()) {
+                        lastAutoSync = Date.now();
+                        return;
+                    }
+                    await new Promise(r => setTimeout(r, 3000));
                 }
-            ];
-            
-            // Initialize activity log with complete conversation history
-            activityLog = [
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-20T10:00:00',
-                    unita: 'Stoccaggio 50',
-                    dettagli: 'Consegna prevista: 13 Gennaio - Piano cottura e il lavello'
-                },
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-29T14:00:00',
-                    unita: 'LungaMarcia 14',
-                    dettagli: 'Consegna prevista: 15 Gennaio'
-                },
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-29T14:05:00',
-                    unita: 'Beach 21',
-                    dettagli: 'Consegna prevista: 15 Gennaio'
-                },
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-29T14:10:00',
-                    unita: 'Montacarichi 1',
-                    dettagli: 'Consegna prevista: 20 Gennaio'
-                },
-                {
-                    tipo: 'nota_aggiunta',
-                    timestamp: '2025-12-29T14:30:00',
-                    unita: 'Beach 21',
-                    dettagli: 'Aggiunta nota: Piano cottura e il lavello'
-                },
-                {
-                    tipo: 'nota_aggiunta',
-                    timestamp: '2025-12-29T14:30:00',
-                    unita: 'LungaMarcia 14',
-                    dettagli: 'Aggiunta nota: Piano cottura e il lavello'
-                },
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-29T15:00:00',
-                    unita: 'Silos 13',
-                    dettagli: 'Consegna prevista: 9 Gennaio'
-                },
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-29T15:30:00',
-                    unita: 'Fabbrica 15',
-                    dettagli: 'Consegna prevista: 8 Gennaio'
-                },
-                {
-                    tipo: 'nota_aggiunta',
-                    timestamp: '2025-12-29T16:00:00',
-                    unita: 'Silos 13',
-                    dettagli: 'Aggiunta nota: Piano cottura e il lavello'
-                },
-                {
-                    tipo: 'nota_aggiunta',
-                    timestamp: '2025-12-29T16:00:00',
-                    unita: 'Fabbrica 15',
-                    dettagli: 'Aggiunta nota: Piano cottura e il lavello'
-                },
-                {
-                    tipo: 'inserimento',
-                    timestamp: '2025-12-30T16:30:00',
-                    unita: 'Cemento Armato',
-                    dettagli: 'Consegna prevista: 22 Gennaio'
-                }
-            ];
-            
-            saveToLocalStorage();
-            renderDeliveries();
+                showSyncError();
+            } finally {
+                autoSyncRunning = false;
+            }
         }
+        autoSync();
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') autoSync();
+        });
+        window.addEventListener('pageshow', (e) => {
+            if (e.persisted) autoSync();
+        });
     </script>
 </body>
 </html>
