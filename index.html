@@ -1233,7 +1233,7 @@
         <form class="login-box" onsubmit="login(event)">
             <div style="font-size: 40px;">🏠</div>
             <h2>Consegne Immobili</h2>
-            <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" required>
+            <input type="text" id="loginUsername" placeholder="Username" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required>
             <input type="password" id="loginPassword" placeholder="Password" autocomplete="current-password" required>
             <div class="login-error" id="loginError"></div>
             <button type="submit" id="loginButton">Accedi</button>
@@ -1369,17 +1369,19 @@
             const error = document.getElementById('loginError');
             error.textContent = '';
             button.disabled = true;
+            const email = usernameToEmail(document.getElementById('loginUsername').value);
             try {
-                await fbAuth.signInWithEmailAndPassword(
-                    usernameToEmail(document.getElementById('loginUsername').value),
-                    document.getElementById('loginPassword').value
-                );
+                await fbAuth.signInWithEmailAndPassword(email, document.getElementById('loginPassword').value);
                 document.getElementById('loginPassword').value = '';
             } catch (e) {
                 console.error('Login fallito:', e);
-                error.textContent = (e.code === 'auth/network-request-failed')
-                    ? 'Nessuna connessione, riprova'
-                    : 'Username o password errati';
+                const messaggi = {
+                    'auth/network-request-failed': 'Nessuna connessione, riprova',
+                    'auth/too-many-requests': 'Troppi tentativi: attendi qualche minuto e riprova',
+                    'auth/user-disabled': 'Utente disattivato',
+                    'auth/invalid-email': `Username non valido (${email})`
+                };
+                error.textContent = messaggi[e.code] || `Username o password errati (account: ${email})`;
             } finally {
                 button.disabled = false;
             }
