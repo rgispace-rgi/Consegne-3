@@ -346,6 +346,31 @@
             color: #333;
         }
 
+        /* Dotazioni e note sulla card (spazio a destra per il badge di stato) */
+        .dotazioni {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-top: 8px;
+            margin-right: 120px;
+        }
+
+        .dotazione {
+            background: #e8f5e9;
+            color: #2e7d32;
+            padding: 3px 9px;
+            border-radius: 15px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .dotazione.nota {
+            background: #fff8e1;
+            color: #8d6e00;
+            white-space: normal;
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -1284,6 +1309,7 @@
                 oraConsegna: c.oraConsegna || '',
                 createdDate: c.dataInserimento || tsToIso(c.createdAt) || new Date().toISOString(),
                 notes: c.note || '',
+                checklist: c.checklist || null,
                 completedDate: c.completedDate || null,
                 stato: c.stato || 'da_consegnare'
             }));
@@ -1894,6 +1920,47 @@
             }
         }
         
+        // Dotazioni (checklist della PWA) e note riconosciute, come simboli
+        function getDotazioni(delivery) {
+            const cl = delivery.checklist || {};
+            let note = String(delivery.notes || '');
+            const out = [];
+            const togli = re => { note = note.replace(re, ' '); };
+
+            if (cl.pianoCottura || /piano\s+cottura/i.test(note)) {
+                out.push({ icon: '🍳', label: 'Piano cottura' });
+            }
+            togli(/(con\s+)?piano\s+cottura(\s+e)?(\s+il)?(\s+lavello)?/gi);
+            if (cl.piastraInduzione) out.push({ icon: '⚡', label: 'Induzione' });
+            if (cl.attacchiLavatrice) out.push({ icon: '🧺', label: 'Lavatrice' });
+            if (cl.attacchiLavastoviglie) out.push({ icon: '🍽️', label: 'Lavastoviglie' });
+
+            if (/non\s+arredat/i.test(note)) {
+                out.push({ icon: '📦', label: 'Non arredato' });
+            } else if (/arredat/i.test(note)) {
+                out.push({ icon: '🛋️', label: 'Arredato' });
+            }
+            togli(/(non\s+)?arredat[oa]/gi);
+
+            const resto = note.replace(/[\s.,;:-]+/g, ' ').trim();
+            if (resto) {
+                out.push({ icon: '📝', label: resto.length > 30 ? resto.slice(0, 30) + '…' : resto, nota: true });
+            }
+            return out;
+        }
+
+        function renderDotazioni(delivery) {
+            const items = getDotazioni(delivery);
+            if (!items.length) return '';
+            return `<div class="dotazioni">${items.map(i =>
+                `<span class="dotazione${i.nota ? ' nota' : ''}">${i.icon} ${escapeHtml(i.label)}</span>`
+            ).join('')}</div>`;
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
         function renderDeliveryCard(delivery) {
             const deliveryClass = getDeliveryClass(delivery);
             const daysUntil = getDaysUntil(delivery.deliveryDate);
@@ -1950,6 +2017,7 @@
                         <br>
                         <small>${statusText}</small>
                     </div>
+                    ${renderDotazioni(delivery)}
                     ${badgeHtml}
                 </div>
             `;
@@ -2002,6 +2070,15 @@
                         </div>
                     </div>
                 `}
+                ${getDotazioni(delivery).some(i => !i.nota) ? `
+                    <div class="detail-row">
+                        <div class="detail-label">📋 Dotazioni</div>
+                        <div class="detail-value dotazioni" style="margin-right: 0;">
+                            ${getDotazioni(delivery).filter(i => !i.nota).map(i =>
+                                `<span class="dotazione">${i.icon} ${escapeHtml(i.label)}</span>`).join('')}
+                        </div>
+                    </div>
+                ` : ''}
                 ${delivery.notes ? `
                     <div class="notes-section">
                         <h4>📝 Note / Punti da Completare</h4>
